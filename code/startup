@@ -1,0 +1,14 @@
+#!/bin/bash
+echo project name is $DJANGO_NAME .
+#
+if [ -z $DJANGO_NAME ]; then
+    echo env:DJANGO_NAME must be defined as project name.
+    exit 1
+fi
+
+if [ ! -d $DJANGO_NAME ]; then
+    echo project folder '$DJANGO_NAME' is not exist, now initialize project.
+    django-admin startproject $DJANGO_NAME
+fi
+cd ${DJANGO_NAME}
+uwsgi --socket :8001 --module ${DJANGO_NAME}.wsgi --uid www-data --py-autoreload 1

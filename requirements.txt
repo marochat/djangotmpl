@@ -1,0 +1,10 @@
+Django
+structlog
+django-bootstrap5
+django-structlog
+django-tinymce
+feedparser
+mysqlclient
+PyMySQL
+uwsgi
+numpy

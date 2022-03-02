@@ -1,0 +1,31 @@
+version: '3,7'
+
+services:
+  django:
+    build: ./
+    image: django_project
+    user: www-data
+    expose:
+      - "8001"
+    volumes:
+      - ./code:/code
+    environment:
+      - TZ=Asia/Tokyo
+      - DJANGO_NAME=${DJANGO_NAME}
+    restart: always
+  nginx:
+    image: nginx:latest
+    expose:
+      - "80"
+    ports:
+      - "8000:80"
+    depends_on:
+      - django
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/uwsgi_params:/etc/nginx/uwsgi_params
+      - ./code/${DJANGO_NAME}/static:/static
+    environment:
+      - TZ=Asia/Tokyo
+    restart: always
+
