@@ -8,7 +8,18 @@ fi
 
 if [ ! -d $DJANGO_NAME ]; then
     echo project folder '$DJANGO_NAME' is not exist, now initialize project.
+    # Initialize django project name as 
     django-admin startproject $DJANGO_NAME
+    # edit settings.py
+    pushd ${DJANGO_NAME}/${DJANGO_NAME}
+    if [ -f settings.py ]; then
+        echo Edit settings.py ....
+        cat settings.py \
+            | sed -r "s/^ALLOWED_HOSTS.+$/ALLOWED_HOSTS \= \['*'\]/g" > tmpfile
+        rm settings.py
+        mv tmpfile settings.py
+    fi
+    popd
 fi
 cd ${DJANGO_NAME}
 uwsgi --socket :8001 --module ${DJANGO_NAME}.wsgi --uid www-data --py-autoreload 1
