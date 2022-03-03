@@ -1,5 +1,6 @@
 FROM python:3.10.2-slim-bullseye
 
+# install ruby
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
@@ -113,6 +114,7 @@ ENV PATH $GEM_HOME/bin:$PATH
 # adjust permissions of a few directories for running "gem install" as an arbitrary user
 RUN mkdir -p "$GEM_HOME" && chmod 777 "$GEM_HOME"
 
+# python web and database library install
 ENV PYTHONUNBUFFERED 1
 RUN mkdir /code
 WORKDIR /code
@@ -139,6 +141,15 @@ RUN set -eux; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \
     rm -rf /var/lib/apt/lists/*; \
     apt update; apt install -y wget
+# nodejs
+RUN set -eux; \
+    apt update; apt install -y nodejs npm; \
+    npm install -g n; \
+    n stable; \
+    apt purge -y --auto-remove nodejs npm
+    #npm install -g typescript
+RUN npm install -g typescript
+
 RUN echo '#!/bin/bash' > /code/startup; \
     echo 'echo startup script.' >> /code/startup; \
     chmod +x /code/startup
