@@ -3,7 +3,7 @@ version: '3,7'
 services:
   django:
     build: .
-    image: django_project
+    image: django_content:latest
     user: www-data
     expose:
       - "8001"
