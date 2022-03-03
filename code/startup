@@ -23,8 +23,29 @@ if [ ! -d $DJANGO_NAME ]; then
 fi
 cd ${DJANGO_NAME}
 # bootstrap などスタティック領域初期化
-if [ -d 'static' ]; then mkdir static; fi
+CUSTOM_SCSS=bootstrap-custom.scss
+CUSTOM_CSS=bootstrap-custom.css
+if [ ! -d 'static' ]; then mkdir static; fi
 pushd static
-
+if [ ! -d 'css' ]; then mkdir css; fi
+cd css
+if [ ! -d 'bootstrap' ]; then
+    ln -s /usr/local/lib/node_modules/bootstrap .
+fi 
+if [ ! -f ${CUSTOM_SCSS} ]; then
+    cat <<EOS > ${CUSTOM_SCSS}
+/*
+$ sass bootstrap-custom.scss bootstrap-custom.css
+*/
+@import "bootstrap/scss/bootstrap.scss";
+EOS
+fi
+sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} &
+popd
+pushd static
+if [ ! -d 'js' ]; then mkdir js; fi
+cd js
+find . -maxdepth 1 -type l -delete
+ln -s /usr/local/lib/node_modules/bootstrap/dist/js/* .
 popd
 uwsgi --socket :8001 --module ${DJANGO_NAME}.wsgi --uid www-data --py-autoreload 1
