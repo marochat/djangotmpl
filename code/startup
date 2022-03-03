@@ -22,4 +22,9 @@ if [ ! -d $DJANGO_NAME ]; then
     popd
 fi
 cd ${DJANGO_NAME}
+# bootstrap などスタティック領域初期化
+if [ -d 'static' ]; then mkdir static; fi
+pushd static
+
+popd
 uwsgi --socket :8001 --module ${DJANGO_NAME}.wsgi --uid www-data --py-autoreload 1
