@@ -24,8 +24,11 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/uwsgi_params:/etc/nginx/uwsgi_params
-      - ./code/${DJANGO_NAME}/static:/static
+      - ./code:/code:ro
+      - ./nginx/90_delay_mount.sh:/docker-entrypoint.d/90_delay_mount.sh:ro
+      #- ./code/${DJANGO_NAME}/static:/static:ro
     environment:
       - TZ=Asia/Tokyo
+      - DJANGO_NAME=${DJANGO_NAME}
     restart: always
 
