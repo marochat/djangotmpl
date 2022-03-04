@@ -37,6 +37,10 @@ RUN set -eux; \
 RUN npm install -g typescript sass; \
     npm install -g bootstrap
 
+# usermod for www-data
+RUN usermod -d /code www-data; \
+    usermod -s /bin/bash www-data
+
 RUN echo '#!/bin/bash' > /code/startup; \
     echo 'echo startup script.' >> /code/startup; \
     chmod +x /code/startup

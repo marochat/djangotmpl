@@ -6,6 +6,7 @@ if [ -z $DJANGO_NAME ]; then
     exit 1
 fi
 
+# construction of main project if not exist project directory
 if [ ! -d $DJANGO_NAME ]; then
     echo project folder '$DJANGO_NAME' is not exist, now initialize project.
     # Initialize django project name as 
@@ -21,7 +22,13 @@ if [ ! -d $DJANGO_NAME ]; then
     fi
     popd
 fi
-cd ${DJANGO_NAME}
+
+# enter to project directory. exit if not exist target directory.
+cd ${DJANGO_NAME} || exit 1
+if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
+    python manage.py startapp ${DJANGO_SPAPP}
+fi
+
 # bootstrap などスタティック領域初期化
 CUSTOM_SCSS=bootstrap-custom.scss
 CUSTOM_CSS=bootstrap-custom.css

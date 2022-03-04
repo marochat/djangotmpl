@@ -153,6 +153,7 @@ cython_debug/
 
 # ignore djago code
 code/*/
+code/.*
 
 # ignore core tours
 .tours/

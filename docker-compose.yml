@@ -12,6 +12,7 @@ services:
     environment:
       - TZ=Asia/Tokyo
       - DJANGO_NAME=${DJANGO_NAME}
+      - DJANGO_SPAPP=${DJANGO_SPAPP}
     restart: always
   nginx:
     image: nginx:alpine
