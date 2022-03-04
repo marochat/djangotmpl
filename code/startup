@@ -29,9 +29,16 @@ if [ ! -d 'static' ]; then mkdir static; fi
 pushd static
 if [ ! -d 'css' ]; then mkdir css; fi
 cd css
+
+# bootstrap 導入
+# シンボリックリンクでは静的アクセス(nginx service)からアクセス出来ない
+# 問題があったのでコピーに変更
 if [ ! -d 'bootstrap' ]; then
-    ln -s /usr/local/lib/node_modules/bootstrap .
-fi 
+    rm -rf bootstrap
+fi
+cp -rf /usr/local/lib/node_modules/bootstrap .
+
+# カスタムSCSSのテンプレート作成と監視型コンパイラ起動
 if [ ! -f ${CUSTOM_SCSS} ]; then
     cat <<EOS > ${CUSTOM_SCSS}
 /*
@@ -42,10 +49,15 @@ EOS
 fi
 sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} &
 popd
+
+# jsディレクトリ更新:bootstrapなどからのリンク生成
 pushd static
 if [ ! -d 'js' ]; then mkdir js; fi
 cd js
+# シンボリックリンクを張り直す
 find . -maxdepth 1 -type l -delete
-ln -s /usr/local/lib/node_modules/bootstrap/dist/js/* .
+ln -s ../css/bootstrap/dist/js/* .
 popd
+
+# uwsgiデーモン起動
 uwsgi --socket :8001 --module ${DJANGO_NAME}.wsgi --uid www-data --py-autoreload 1
