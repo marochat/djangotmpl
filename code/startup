@@ -7,7 +7,9 @@ if [ -z $DJANGO_NAME ]; then
     echo env:DJANGO_NAME must be defined as project name.
     exit 1
 fi
-
+# -----------------------------------------------------------
+# プロジェクト初期化
+# -----------------------------------------------------------
 # construction of main project if not exist project directory
 if [ ! -d $DJANGO_NAME ]; then
     echo project folder '$DJANGO_NAME' is not exist, now initialize project.
@@ -29,7 +31,9 @@ if [ ! -d $DJANGO_NAME ]; then
     fi
     popd
 fi
-
+#----------------------------------------------------------------
+# シングルページ APP 初期化
+#----------------------------------------------------------------
 # enter to project directory. exit if not exist target directory.
 cd ${DJANGO_NAME} || exit 1
 if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
@@ -40,9 +44,14 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     APPCONFIG=${DJANGO_SPAPP}.apps.${APPCAP}Config
     pushd ${DJANGO_NAME}
     # edit settings.py
+    #   installed apps <-- spapp
+    #   add import library
+    #   add common template directory
     cat settings.py \
         | sed -zr "s/(\nINSTALLED_APPS = \[\n)/\1    '${APPCONFIG}',\n/g" \
-        | sed -zr "s/(\nINSTALLED_APPS = \[\n[^]]*)(\])/\1    'tinymce',\n    'django_bootstrap5',\n\2/g" > tmpfile
+        | sed -zr "s/(\nINSTALLED_APPS = \[\n[^]]*)(\])/\1    'tinymce',\n    'django_bootstrap5',\n\2/g" \
+        | sed -r "/^from pathlib/iimport os" \
+        | sed -zr "s/(\nTEMPLATES = .+'DIRS': )\[\]/\1[os.path.join(BASE_DIR, 'templates')]/g" > tmpfile
         rm settings.py
         mv tmpfile settings.py
     # edit urls.py
@@ -54,9 +63,85 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     rm urls.py
     mv tmpfile urls.py
     popd
-fi
+    # enter app directory
+    pushd ${DJANGO_SPAPP} || exit 1
+    if [ -f urls.py ]; then rm urls.py; fi
+    # making app/urls.py
+    cat <<APPURLS > urls.py
+from django.urls import path
 
-# bootstrap などスタティック領域初期化
+from . import views
+
+app_name = '${DJANGO_SPAPP}'
+
+urlpatterns = [
+    path('', views.IndexView.as_view(), name='index'),
+]
+APPURLS
+    # making app/views.py
+    cat <<APPVIEWS >> views.py
+from django.views import generic
+
+class IndexView(generic.TemplateView):
+    template_name = '${DJANGO_SPAPP}/index.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return context
+
+APPVIEWS
+    # making app/template HTML
+    mkdir templates
+    mkdir templates/${DJANGO_SPAPP}
+    pushd templates/${DJANGO_SPAPP}
+    # template index.html
+    cat <<APPTMPINDEX > index.html
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+  <h2>sample template for index page</h2>
+  <p>
+    this is sample page
+  </p>
+{% endblock %}
+APPTMPINDEX
+    popd
+    popd
+    # making common template base.html
+    if [ ! -d 'templates' ]; then mkdir templates; fi
+    pushd templates || exit 1
+    cat <<APPTMPBASE > base.html
+<!doctype html>
+<html lang="ja">
+  {% load static %}
+  {% load django_bootstrap5 %}
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="keywords" content="{% block meta_keywords %}{% endblock %}">
+    <meta name="description" content="{% block meta_description %}{% endblock %}">
+    <title>${DJANGO_NAME}{% block title_info %}{% endblock %}</title>
+    <link rel="icon" href="{% static 'img/favicon.ico' %}">
+    <meta name="google-site-verification" content="KQ5nKoMUl_r-A1yDZXwTkCW70M9eBFxXoy-rEZ6ugbQ" />
+		<style type="text/css">
+			@import  "{% static 'css/bootstrap-custom.css' %}";
+		</style>
+		<script type="module">
+      import { Alert, Button, Carousel, Collapse, Dropdown, Modal, Offcanvas, Popover, ScrollSpy, Tab, Toast, Tooltip } from "{% static 'js/bootstrap.esm.js' %}"
+		</script>
+  </head>
+  <body>
+    <h1>This is Base Template Title</h1>
+    {% block content %}
+    {% endblock %}
+  </body>
+</html>
+APPTMPBASE
+    popd
+fi
+# ---------------------------------------------
+# CSS領域 (bootstrap) などスタティック領域初期化
+# ---------------------------------------------
 CUSTOM_SCSS=bootstrap-custom.scss
 CUSTOM_CSS=bootstrap-custom.css
 if [ ! -d 'static' ]; then mkdir static; fi
@@ -84,13 +169,34 @@ fi
 sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} &
 popd
 
+# tinymce
+pushd static
+if [ -d tinymce ]; then rm -rf tinymce; fi
+cp -rf $(python -c "import site; print (site.getsitepackages()[0])")/tinymce/static/tinymce .
+popd
+
+# --------------------------------------------------
 # jsディレクトリ更新:bootstrapなどからのリンク生成
+# --------------------------------------------------
 pushd static
 if [ ! -d 'js' ]; then mkdir js; fi
 cd js
-# シンボリックリンクを張り直す
-find . -maxdepth 1 -type l -delete
-ln -s ../css/bootstrap/dist/js/* .
+# シンボリックリンクを張り直す -> コピーに変更
+#find . -maxdepth 1 -type l -delete
+cp -rf ../css/bootstrap/dist/js/* .
+cp -rf ../css/bootstrap/node_modules/@popperjs .
+# bootstrap.esm.js のimportパスの修正（先頭に ./ の追加）
+cat bootstrap.esm.js \
+    | sed -r "s/^(import .* as Popper from .*)@(.*)$/\1.\/@\2;/g" > tmpfile
+rm bootstrap.esm.js
+mv tmpfile bootstrap.esm.js
+popd
+
+# admin用のstaticデータを静的領域にコピーする
+pushd static
+echo copy to static admin.
+if [ -d admin ]; then rm -rf admin; fi
+cp -rf $(python -c "import site; print (site.getsitepackages()[0])")/django/contrib/admin/static/admin . || exit 1
 popd
 
 # uwsgiデーモン起動
