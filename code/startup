@@ -1,6 +1,8 @@
 #!/bin/bash
 echo project name is $DJANGO_NAME .
 #
+sudo chown www-data.www-data . || exit 1
+
 if [ -z $DJANGO_NAME ]; then
     echo env:DJANGO_NAME must be defined as project name.
     exit 1
@@ -16,7 +18,10 @@ if [ ! -d $DJANGO_NAME ]; then
     if [ -f settings.py ]; then
         echo Edit settings.py ....
         cat settings.py \
-            | sed -r "s/^ALLOWED_HOSTS.+$/ALLOWED_HOSTS \= \['*'\]/g" > tmpfile
+            | sed -r "s/^ALLOWED_HOSTS.+$/ALLOWED_HOSTS \= \['*'\]/g" \
+            | sed -r "/^USE_TZ = True$/iUSE_L10N = True\n" \
+            | sed -r "s/^LANGUAGE_CODE = .+$/LANGUAGE_CODE = 'ja-JP'/g" \
+            | sed -r "s/TIME_ZONE = .+$/TIME_ZONE = 'Asia\/Tokyo'/g" > tmpfile
         rm settings.py
         mv tmpfile settings.py
     fi
@@ -27,6 +32,24 @@ fi
 cd ${DJANGO_NAME} || exit 1
 if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     python manage.py startapp ${DJANGO_SPAPP}
+    APPCAP=$(echo ${DJANGO_SPAPP} | sed 's/\(.\)\(.*\)/\U\1\L\2/g')
+    APPCONFIG=${DJANGO_SPAPP}.apps.${APPCAP}Config
+    pushd ${DJANGO_NAME}
+    # edit settings.py
+    cat settings.py \
+        | sed -zr "s/(\nINSTALLED_APPS = \[\n)/\1    '${APPCONFIG}',\n/g" \
+        | sed -zr "s/(\nINSTALLED_APPS = \[\n[^]]*)(\])/\1    'tinymce',\n    'django_bootstrap5',\n\2/g" > tmpfile
+        rm settings.py
+        mv tmpfile settings.py
+    # edit urls.py
+    cat urls.py \
+        | sed -r "s/^(from django.urls import ).+$/\1include, path/g" \
+        | sed -r "/^urlpatterns/iimport tinymce\n" \
+        | sed -zr "s/(\nurlpatterns = \[[^]]*)(\])/\1    path('', include('${DJANGO_SPAPP}.urls')),\n\2/g" \
+        | sed -zr "s/(\nurlpatterns = \[[^]]*)(\])/\1    path('tinymce\/', include('tinymce.urls')),\n\2/g" > tmpfile
+    rm urls.py
+    mv tmpfile urls.py
+    popd
 fi
 
 # bootstrap などスタティック領域初期化

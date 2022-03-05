@@ -29,7 +29,7 @@ RUN set -eux; \
     apt update; apt install -y wget
 # nodejs
 RUN set -eux; \
-    apt update; apt install -y nodejs npm git; \
+    apt update; apt install -y nodejs npm git sudo; \
     npm install -g n; \
     n stable; \
     apt purge -y --auto-remove nodejs npm
@@ -37,9 +37,11 @@ RUN set -eux; \
 RUN npm install -g typescript sass; \
     npm install -g bootstrap
 
-# usermod for www-data
+# usermod for www-data & sudo group
 RUN usermod -d /code www-data; \
-    usermod -s /bin/bash www-data
+    usermod -s /bin/bash www-data; \
+    echo "%www-data ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/www-data
+    #adduser www-data sudo
 
 RUN echo '#!/bin/bash' > /code/startup; \
     echo 'echo startup script.' >> /code/startup; \
