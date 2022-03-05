@@ -17,6 +17,8 @@ if [ ! -d $DJANGO_NAME ]; then
     pushd ${DJANGO_NAME}/${DJANGO_NAME}
     if [ -f settings.py ]; then
         echo Edit settings.py ....
+        # edit:
+        # ALLOWED_HOSTS to all & USE_L10N = True & LANGUAGE -> ja-JP
         cat settings.py \
             | sed -r "s/^ALLOWED_HOSTS.+$/ALLOWED_HOSTS \= \['*'\]/g" \
             | sed -r "/^USE_TZ = True$/iUSE_L10N = True\n" \
@@ -32,7 +34,9 @@ fi
 cd ${DJANGO_NAME} || exit 1
 if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     python manage.py startapp ${DJANGO_SPAPP}
+    # APPCAP capitalize of application name.
     APPCAP=$(echo ${DJANGO_SPAPP} | sed 's/\(.\)\(.*\)/\U\1\L\2/g')
+    # app config name.
     APPCONFIG=${DJANGO_SPAPP}.apps.${APPCAP}Config
     pushd ${DJANGO_NAME}
     # edit settings.py
