@@ -101,8 +101,21 @@ APPVIEWS
 {% block content %}
   <h2>sample template for index page</h2>
   <p>
-    this is sample page
+    this is sample page<br/>
+    <span id="1"></span>
   </p>
+{% endblock %}
+{% block scripthead %}
+  <!--
+  <script type="text/javascript" src="{% static '${DJANGO_SPAPP}/js/${DJANGO_SPAPP}.js' %}">
+  </script>
+  -->
+{% endblock %}
+{% block script %}
+  <script type="module">
+    import {init} from "{% static '${DJANGO_SPAPP}/js/${DJANGO_SPAPP}.js' %}"
+    window.addEventListener("load", init());
+  </script>
 {% endblock %}
 APPTMPINDEX
     popd
@@ -123,17 +136,23 @@ APPTMPINDEX
     <title>${DJANGO_NAME}{% block title_info %}{% endblock %}</title>
     <link rel="icon" href="{% static 'img/favicon.ico' %}">
     <meta name="google-site-verification" content="KQ5nKoMUl_r-A1yDZXwTkCW70M9eBFxXoy-rEZ6ugbQ" />
-		<style type="text/css">
-			@import  "{% static 'css/bootstrap-custom.css' %}";
-		</style>
-		<script type="module">
+	<style type="text/css">
+	  @import  "{% static 'css/bootstrap-custom.css' %}";
+	</style>
+	<script type="module">
       import { Alert, Button, Carousel, Collapse, Dropdown, Modal, Offcanvas, Popover, ScrollSpy, Tab, Toast, Tooltip } from "{% static 'js/bootstrap.esm.js' %}"
-		</script>
+	</script>
   </head>
   <body>
-    <h1>This is Base Template Title</h1>
-    {% block content %}
-    {% endblock %}
+    <nav>This is Base Template Title</nav>
+    <main>
+      {% block content %}
+      {% endblock %}
+    </main>
+    <footer>
+      {% block footer %}{% endblock %}
+    </footer>
+    {% block script %}{% endblock %}
   </body>
 </html>
 APPTMPBASE
@@ -166,7 +185,7 @@ $ sass bootstrap-custom.scss bootstrap-custom.css
 @import "bootstrap/scss/bootstrap.scss";
 EOS
 fi
-sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} &
+sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} >& sass.log &
 popd
 
 # tinymce
@@ -191,6 +210,28 @@ cat bootstrap.esm.js \
 rm bootstrap.esm.js
 mv tmpfile bootstrap.esm.js
 popd
+
+# javascript(typescript) sample initialize
+pushd static
+if [ ! -d ${DJANGO_SPAPP} ]; then
+    mkdir ${DJANGO_SPAPP}
+    mkdir ${DJANGO_SPAPP}/js
+    mkdir ${DJANGO_SPAPP}/ts
+    cd ${DJANGO_SPAPP}/ts || exit 1
+    tsc --init
+    SPASCRIPT=${DJANGO_SPAPP}.ts
+    cat <<SPASCRIPTCODE > ${SPASCRIPT}
+export let init = () => {
+  var sp1 = document.getElementById("1");
+  sp1!.innerHTML = "javascript sample text";
+}
+SPASCRIPTCODE
+    cd ../../
+fi
+cd ${DJANGO_SPAPP}/ts || exit 1
+tsc -p . --outDir ../js -w &> tscout.log &
+popd
+
 
 # admin用のstaticデータを静的領域にコピーする
 pushd static
