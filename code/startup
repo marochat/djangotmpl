@@ -200,18 +200,18 @@ nav {
         }
     }
     div {
-      ul {
-          @extend .navbar-nav, .me-auto;
-          li {
-              @extend .nav-item, .active;
-          }
-      }
-      a {
-          @extend .nav-link;
-      }
-      a.btn {
-          @extend .btn, .btn-outline-success, .my-2, .my-sm-0;
-      }
+        ul {
+            @extend .navbar-nav, .me-auto;
+            li {
+                @extend .nav-item, .active;
+            }
+        }
+        a {
+            @extend .nav-link;
+        }
+        a.btn {
+            @extend .btn, .btn-outline-success, .my-2, .my-sm-0;
+        }
     }
 }
 main {
@@ -241,7 +241,7 @@ main {
             @extend h5;
         }
     }
-    @mixin site-card {
+    @mixin side-card {
         @extend .px-0, .mx-0, .my-2;
         aside {
             @extend .card-body;
@@ -259,19 +259,19 @@ main {
             }
         }
     }
-    @mixin columns-3($start, $center, $end) {
+    @mixin columns-3(\$start, \$center, \$end) {
         @extend .row, .justify-content-md-center;
         div.column-start {
-            @extend .order-2, .order-md-1, .col-md-#{start}, .px-1;
+            @extend .order-2, .order-md-1, .col-md-#{\$start}, .px-1;
             div.card {
-                @include site-card();
+                @include side-card();
             }
         }
         div.column-center {
-            @extend .col-12, .order-1, .order-md-2, .col-md-#{center}, .px-1, .mx-0;
+            @extend .col-12, .order-1, .order-md-2, .col-md-#{\$center}, .px-1, .mx-0;
         }
         div.column-end {
-            @extend .order-3, .order-md-3, .col-md-#{end}, .px-1;
+            @extend .order-3, .order-md-3, .col-md-#{\$end}, .px-1;
             div.card {
                 @include side-card();
             }
