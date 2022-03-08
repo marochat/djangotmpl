@@ -34,7 +34,7 @@ RUN set -eux; \
     n stable; \
     apt purge -y --auto-remove nodejs npm
     #npm install -g typescript
-RUN npm install -g typescript commonjs sass; \
+RUN npm install -g ts-node typescript sass; \
     npm install -g bootstrap
 
 # usermod for www-data & sudo group

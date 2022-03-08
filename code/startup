@@ -161,8 +161,9 @@ fi
 # ---------------------------------------------
 # CSS領域 (bootstrap) などスタティック領域初期化
 # ---------------------------------------------
-CUSTOM_SCSS=bootstrap-custom.scss
-CUSTOM_CSS=bootstrap-custom.css
+CUSTOM_STYLE=bootstrap-custom
+CUSTOM_SCSS=${CUSTOM_STYLE}.scss
+CUSTOM_CSS=${CUSTOM_STYLE}.css
 if [ ! -d 'static' ]; then mkdir static; fi
 pushd static
 if [ ! -d 'css' ]; then mkdir css; fi
@@ -183,6 +184,106 @@ if [ ! -f ${CUSTOM_SCSS} ]; then
 $ sass bootstrap-custom.scss bootstrap-custom.css
 */
 @import "bootstrap/scss/bootstrap.scss";
+
+nav {
+    @extend .navbar, .navbar-expand-md, .navbar-dark, .text-light, .bg-dark, .px-3;
+    a.brand {
+        @extend .navbar-brand;
+    }
+    label {
+        @extend .navbar-brand, .btn, .m-0;
+    }
+    button {
+        @extend .navbar-toggler;
+        span {
+            @extend .navbar-toggler-icon;
+        }
+    }
+    div {
+      ul {
+          @extend .navbar-nav, .me-auto;
+          li {
+              @extend .nav-item, .active;
+          }
+      }
+      a {
+          @extend .nav-link;
+      }
+      a.btn {
+          @extend .btn, .btn-outline-success, .my-2, .my-sm-0;
+      }
+    }
+}
+main {
+    @extend .container-fluid;
+    header {
+        @extend .container, .my-2, h4;
+        figcaption {
+            font-size: 10px;
+            font-weight: normal;
+            text-align: right;
+            width: 100%;
+        }
+    }
+    footer {
+        @extend .container, .my-2;
+        text-align: right;
+        span {
+            @expand .text-muted;
+            font-size: small;
+            font-style: italic;
+            display: inline-block;
+        }
+    }
+    article {
+        @extend .container, .my-2;
+        header {
+            @extend h5;
+        }
+    }
+    @mixin site-card {
+        @extend .px-0, .mx-0, .my-2;
+        aside {
+            @extend .card-body;
+            header {
+                @extend h4, .card-title, .btn, .rounded-pill, .btn-outline-dark;
+            }
+            ul {
+                @extend .list-group, .list-group-flush;
+                li {
+                    @extend .list-group-item;
+                }
+                a {
+                    @extend .h6, .small;
+                }
+            }
+        }
+    }
+    @mixin columns-3($start, $center, $end) {
+        @extend .row, .justify-content-md-center;
+        div.column-start {
+            @extend .order-2, .order-md-1, .col-md-#{start}, .px-1;
+            div.card {
+                @include site-card();
+            }
+        }
+        div.column-center {
+            @extend .col-12, .order-1, .order-md-2, .col-md-#{center}, .px-1, .mx-0;
+        }
+        div.column-end {
+            @extend .order-3, .order-md-3, .col-md-#{end}, .px-1;
+            div.card {
+                @include side-card();
+            }
+        }
+    }
+    div.column3 {
+        @include columns-3(2,7,3);
+    }
+    div.column3x {
+        @include columns-3(1,10,1);
+    }
+}
 EOS
 fi
 sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} >& sass.log &
@@ -204,9 +305,9 @@ cd js
 #find . -maxdepth 1 -type l -delete
 cp -rf ../css/bootstrap/dist/js/* .
 cp -rf ../css/bootstrap/node_modules/@popperjs .
-# bootstrap.esm.js のimportパスの修正（先頭に ./ の追加）
+# bootstrap.esm.js のimportパスの修正（先頭に popper.js への相対パスに変更）
 cat bootstrap.esm.js \
-    | sed -r "s/^(import .* as Popper from .*)@(.*)$/\1.\/@\2;/g" > tmpfile
+    | sed -r "s/^(import .* as Popper from .*').+(';)$/\1.\/@popperjs\/core\/dist\/esm\/popper.js\2/g" > tmpfile
 rm bootstrap.esm.js
 mv tmpfile bootstrap.esm.js
 popd
@@ -219,6 +320,11 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
     mkdir ${DJANGO_SPAPP}/ts
     cd ${DJANGO_SPAPP}/ts || exit 1
     tsc --init
+    # tsconfig 編集 for フロントエンド
+    cat tsconfig.json \
+      | sed -r "s/^(\s*\"module\": )\"commonjs\"(.*)$/\1\"esnext\"\2/g" > tmpfile
+    rm tsconfig.json
+    mv tmpfile tsconfig.json
     SPASCRIPT=${DJANGO_SPAPP}.ts
     cat <<SPASCRIPTCODE > ${SPASCRIPT}
 export let init = () => {
