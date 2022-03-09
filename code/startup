@@ -42,6 +42,8 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     APPCAP=$(echo ${DJANGO_SPAPP} | sed 's/\(.\)\(.*\)/\U\1\L\2/g')
     # app config name.
     APPCONFIG=${DJANGO_SPAPP}.apps.${APPCAP}Config
+    # make log directory
+    if [ ! -d logs ]; then mkdir logs; fi
     pushd ${DJANGO_NAME}
     # edit settings.py
     #   installed apps <-- spapp
@@ -51,9 +53,79 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
         | sed -zr "s/(\nINSTALLED_APPS = \[\n)/\1    '${APPCONFIG}',\n/g" \
         | sed -zr "s/(\nINSTALLED_APPS = \[\n[^]]*)(\])/\1    'tinymce',\n    'django_bootstrap5',\n\2/g" \
         | sed -r "/^from pathlib/iimport os" \
+        | sed -r "/^from pathlib/aimport structlog" \
+        | sed -zr "s/(\nMIDDLEWARE = \[\n[^]]*)(\])/\1    'django_structlog.middlewares.RequestMiddleware',\n\2/g" \
         | sed -zr "s/(\nTEMPLATES = .+'DIRS': )\[\]/\1[os.path.join(BASE_DIR, 'templates')]/g" > tmpfile
         rm settings.py
         mv tmpfile settings.py
+    # add other settings
+    # --- suructlog setting, from the official example and additional setting.
+    cat <<STTINGS0 | sed -r "s/^ {8}//g" >> settings.py
+
+        LOGGING = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "json_formatter": {
+                    "()": structlog.stdlib.ProcessorFormatter,
+                    "processor": structlog.processors.JSONRenderer(),
+                },
+                "plain_console": {
+                    "()": structlog.stdlib.ProcessorFormatter,
+                    "processor": structlog.dev.ConsoleRenderer(),
+                },
+                "key_value": {
+                    "()": structlog.stdlib.ProcessorFormatter,
+                    "processor": structlog.processors.KeyValueRenderer(key_order=['timestamp', 'level', 'event', 'logger']),
+                },
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "plain_console",
+                },
+                "json_file": {
+                    "class": "logging.handlers.WatchedFileHandler",
+                    "filename": "logs/access__json.log",  ##ここでjson形式のログファイルPathを指定する
+                    "formatter": "json_formatter",
+                },
+                "flat_line_file": {
+                    "class": "logging.handlers.WatchedFileHandler",
+                    "filename": "logs/access__flat_line.log",  ##ここでflat_line形式のログファイルPathを指定する
+                    "formatter": "key_value",
+                },
+            },
+            "loggers": {
+                "django_structlog": {
+                    "handlers": ["console", "flat_line_file", "json_file"],
+                    "level": "INFO",
+                },
+                "django_structlog_demo_project": {
+                    "handlers": ["console", "flat_line_file", "json_file"],
+                    "level": "INFO",
+                },
+            }
+        }
+
+        structlog.configure(
+            processors=[
+                structlog.stdlib.filter_by_level,
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.stdlib.add_logger_name,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.PositionalArgumentsFormatter(),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+                structlog.processors.UnicodeDecoder(),
+                structlog.processors.ExceptionPrettyPrinter(),
+                structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+            ],
+            context_class=structlog.threadlocal.wrap_dict(dict),
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
+STTINGS0
     # edit urls.py
     cat urls.py \
         | sed -r "s/^(from django.urls import ).+$/\1include, path/g" \
@@ -67,27 +139,27 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     pushd ${DJANGO_SPAPP} || exit 1
     if [ -f urls.py ]; then rm urls.py; fi
     # making app/urls.py
-    cat <<APPURLS > urls.py
-from django.urls import path
+    cat <<APPURLS | sed -r "s/^ {8}//g" > urls.py
+        from django.urls import path
 
-from . import views
+        from . import views
 
-app_name = '${DJANGO_SPAPP}'
+        app_name = '${DJANGO_SPAPP}'
 
-urlpatterns = [
-    path('', views.IndexView.as_view(), name='index'),
-]
+        urlpatterns = [
+            path('', views.IndexView.as_view(), name='index'),
+        ]
 APPURLS
     # making app/views.py
-    cat <<APPVIEWS >> views.py
-from django.views import generic
+    cat <<APPVIEWS | sed -r "s/^ {8}//g" >> views.py
+        from django.views import generic
 
-class IndexView(generic.TemplateView):
-    template_name = '${DJANGO_SPAPP}/index.html'
+        class IndexView(generic.TemplateView):
+            template_name = '${DJANGO_SPAPP}/index.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return context
+            def get_context_data(self, **kwargs):
+                context = super().get_context_data(**kwargs)
+                return context
 
 APPVIEWS
     # making app/template HTML
@@ -95,66 +167,66 @@ APPVIEWS
     mkdir templates/${DJANGO_SPAPP}
     pushd templates/${DJANGO_SPAPP}
     # template index.html
-    cat <<APPTMPINDEX > index.html
-{% extends 'base.html' %}
-{% load static %}
-{% block content %}
-  <h2>sample template for index page</h2>
-  <p>
-    this is sample page<br/>
-    <span id="1"></span>
-  </p>
-{% endblock %}
-{% block scripthead %}
-  <!--
-  <script type="text/javascript" src="{% static '${DJANGO_SPAPP}/js/${DJANGO_SPAPP}.js' %}">
-  </script>
-  -->
-{% endblock %}
-{% block script %}
-  <script type="module">
-    import {init} from "{% static '${DJANGO_SPAPP}/js/${DJANGO_SPAPP}.js' %}"
-    window.addEventListener("load", init());
-  </script>
-{% endblock %}
+    cat <<APPTMPINDEX | sed -r "s/^ {8}//g" > index.html
+        {% extends 'base.html' %}
+        {% load static %}
+        {% block content %}
+        <h2>sample template for index page</h2>
+        <p>
+            this is sample page<br/>
+            <span id="1"></span>
+        </p>
+        {% endblock %}
+        {% block scripthead %}
+        <!--
+        <script type="text/javascript" src="{% static '${DJANGO_SPAPP}/js/${DJANGO_SPAPP}.js' %}">
+        </script>
+        -->
+        {% endblock %}
+        {% block script %}
+        <script type="module">
+            import {init} from "{% static '${DJANGO_SPAPP}/js/${DJANGO_SPAPP}.js' %}"
+            window.addEventListener("load", init());
+        </script>
+        {% endblock %}
 APPTMPINDEX
     popd
     popd
     # making common template base.html
     if [ ! -d 'templates' ]; then mkdir templates; fi
     pushd templates || exit 1
-    cat <<APPTMPBASE > base.html
-<!doctype html>
-<html lang="ja">
-  {% load static %}
-  {% load django_bootstrap5 %}
-  <head>
-    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="keywords" content="{% block meta_keywords %}{% endblock %}">
-    <meta name="description" content="{% block meta_description %}{% endblock %}">
-    <title>${DJANGO_NAME}{% block title_info %}{% endblock %}</title>
-    <link rel="icon" href="{% static 'img/favicon.ico' %}">
-    <meta name="google-site-verification" content="KQ5nKoMUl_r-A1yDZXwTkCW70M9eBFxXoy-rEZ6ugbQ" />
-	<style type="text/css">
-	  @import  "{% static 'css/bootstrap-custom.css' %}";
-	</style>
-	<script type="module">
-      import { Alert, Button, Carousel, Collapse, Dropdown, Modal, Offcanvas, Popover, ScrollSpy, Tab, Toast, Tooltip } from "{% static 'js/bootstrap.esm.js' %}"
-	</script>
-  </head>
-  <body>
-    <nav>This is Base Template Title</nav>
-    <main>
-      {% block content %}
-      {% endblock %}
-    </main>
-    <footer>
-      {% block footer %}{% endblock %}
-    </footer>
-    {% block script %}{% endblock %}
-  </body>
-</html>
+    cat <<APPTMPBASE | sed -r "s/^ {8}//g" > base.html
+        <!doctype html>
+        <html lang="ja">
+        {% load static %}
+        {% load django_bootstrap5 %}
+        <head>
+            <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="keywords" content="{% block meta_keywords %}{% endblock %}">
+            <meta name="description" content="{% block meta_description %}{% endblock %}">
+            <title>${DJANGO_NAME}{% block title_info %}{% endblock %}</title>
+            <link rel="icon" href="{% static 'img/favicon.ico' %}">
+            <meta name="google-site-verification" content="KQ5nKoMUl_r-A1yDZXwTkCW70M9eBFxXoy-rEZ6ugbQ" />
+            <style type="text/css">
+            @import  "{% static 'css/bootstrap-custom.css' %}";
+            </style>
+            <script type="module">
+            import { Alert, Button, Carousel, Collapse, Dropdown, Modal, Offcanvas, Popover, ScrollSpy, Tab, Toast, Tooltip } from "{% static 'js/bootstrap.esm.js' %}"
+            </script>
+        </head>
+        <body>
+            <nav>This is Base Template Title</nav>
+            <main>
+            {% block content %}
+            {% endblock %}
+            </main>
+            <footer>
+            {% block footer %}{% endblock %}
+            </footer>
+            {% block script %}{% endblock %}
+        </body>
+        </html>
 APPTMPBASE
     popd
 fi
@@ -179,111 +251,111 @@ cp -rf /usr/local/lib/node_modules/bootstrap .
 
 # カスタムSCSSのテンプレート作成と監視型コンパイラ起動
 if [ ! -f ${CUSTOM_SCSS} ]; then
-    cat <<EOS > ${CUSTOM_SCSS}
-/*
-$ sass bootstrap-custom.scss bootstrap-custom.css
-*/
-@import "bootstrap/scss/bootstrap.scss";
+    cat <<EOS | sed -r "s/^ {8}//g" > ${CUSTOM_SCSS}
+        /*
+        $ sass bootstrap-custom.scss bootstrap-custom.css
+        */
+        @import "bootstrap/scss/bootstrap.scss";
 
-nav {
-    @extend .navbar, .navbar-expand-md, .navbar-dark, .text-light, .bg-dark, .px-3;
-    a.brand {
-        @extend .navbar-brand;
-    }
-    label {
-        @extend .navbar-brand, .btn, .m-0;
-    }
-    button {
-        @extend .navbar-toggler;
-        span {
-            @extend .navbar-toggler-icon;
-        }
-    }
-    div {
-        ul {
-            @extend .navbar-nav, .me-auto;
-            li {
-                @extend .nav-item, .active;
+        nav {
+            @extend .navbar, .navbar-expand-md, .navbar-dark, .text-light, .bg-dark, .px-3;
+            a.brand {
+                @extend .navbar-brand;
             }
-        }
-        a {
-            @extend .nav-link;
-        }
-        a.btn {
-            @extend .btn, .btn-outline-success, .my-2, .my-sm-0;
-        }
-    }
-}
-main {
-    @extend .container-fluid;
-    header {
-        @extend .container, .my-2, h4;
-        figcaption {
-            font-size: 10px;
-            font-weight: normal;
-            text-align: right;
-            width: 100%;
-        }
-    }
-    footer {
-        @extend .container, .my-2;
-        text-align: right;
-        span {
-            @expand .text-muted;
-            font-size: small;
-            font-style: italic;
-            display: inline-block;
-        }
-    }
-    article {
-        @extend .container, .my-2;
-        header {
-            @extend h5;
-        }
-    }
-    @mixin side-card {
-        @extend .px-0, .mx-0, .my-2;
-        aside {
-            @extend .card-body;
-            header {
-                @extend h4, .card-title, .btn, .rounded-pill, .btn-outline-dark;
+            label {
+                @extend .navbar-brand, .btn, .m-0;
             }
-            ul {
-                @extend .list-group, .list-group-flush;
-                li {
-                    @extend .list-group-item;
+            button {
+                @extend .navbar-toggler;
+                span {
+                    @extend .navbar-toggler-icon;
+                }
+            }
+            div {
+                ul {
+                    @extend .navbar-nav, .me-auto;
+                    li {
+                        @extend .nav-item, .active;
+                    }
                 }
                 a {
-                    @extend .h6, .small;
+                    @extend .nav-link;
+                }
+                a.btn {
+                    @extend .btn, .btn-outline-success, .my-2, .my-sm-0;
                 }
             }
         }
-    }
-    @mixin columns-3(\$start, \$center, \$end) {
-        @extend .row, .justify-content-md-center;
-        div.column-start {
-            @extend .order-2, .order-md-1, .col-md-#{\$start}, .px-1;
-            div.card {
-                @include side-card();
+        main {
+            @extend .container-fluid;
+            header {
+                @extend .container, .my-2, h4;
+                figcaption {
+                    font-size: 10px;
+                    font-weight: normal;
+                    text-align: right;
+                    width: 100%;
+                }
+            }
+            footer {
+                @extend .container, .my-2;
+                text-align: right;
+                span {
+                    @expand .text-muted;
+                    font-size: small;
+                    font-style: italic;
+                    display: inline-block;
+                }
+            }
+            article {
+                @extend .container, .my-2;
+                header {
+                    @extend h5;
+                }
+            }
+            @mixin side-card {
+                @extend .px-0, .mx-0, .my-2;
+                aside {
+                    @extend .card-body;
+                    header {
+                        @extend h4, .card-title, .btn, .rounded-pill, .btn-outline-dark;
+                    }
+                    ul {
+                        @extend .list-group, .list-group-flush;
+                        li {
+                            @extend .list-group-item;
+                        }
+                        a {
+                            @extend .h6, .small;
+                        }
+                    }
+                }
+            }
+            @mixin columns-3(\$start, \$center, \$end) {
+                @extend .row, .justify-content-md-center;
+                div.column-start {
+                    @extend .order-2, .order-md-1, .col-md-#{\$start}, .px-1;
+                    div.card {
+                        @include side-card();
+                    }
+                }
+                div.column-center {
+                    @extend .col-12, .order-1, .order-md-2, .col-md-#{\$center}, .px-1, .mx-0;
+                }
+                div.column-end {
+                    @extend .order-3, .order-md-3, .col-md-#{\$end}, .px-1;
+                    div.card {
+                        @include side-card();
+                    }
+                }
+            }
+            div.column3 {
+                @include columns-3(2,7,3);
+            }
+            div.column3x {
+                @include columns-3(1,10,1);
             }
         }
-        div.column-center {
-            @extend .col-12, .order-1, .order-md-2, .col-md-#{\$center}, .px-1, .mx-0;
-        }
-        div.column-end {
-            @extend .order-3, .order-md-3, .col-md-#{\$end}, .px-1;
-            div.card {
-                @include side-card();
-            }
-        }
-    }
-    div.column3 {
-        @include columns-3(2,7,3);
-    }
-    div.column3x {
-        @include columns-3(1,10,1);
-    }
-}
 EOS
 fi
 sass --watch ${CUSTOM_SCSS}:${CUSTOM_CSS} >& sass.log &
@@ -326,11 +398,11 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
     rm tsconfig.json
     mv tmpfile tsconfig.json
     SPASCRIPT=${DJANGO_SPAPP}.ts
-    cat <<SPASCRIPTCODE > ${SPASCRIPT}
-export let init = () => {
-  var sp1 = document.getElementById("1");
-  sp1!.innerHTML = "javascript sample text";
-}
+    cat <<SPASCRIPTCODE | sed -r "s/^ {8}//g" > ${SPASCRIPT}
+        export let init = () => {
+        var sp1 = document.getElementById("1");
+        sp1!.innerHTML = "javascript sample text";
+        }
 SPASCRIPTCODE
     cd ../../
 fi

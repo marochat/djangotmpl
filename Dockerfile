@@ -11,7 +11,7 @@ RUN set -eux; \
     devAptMark="$(apt-mark showmanual)"; \
     apt update; \
     apt install -y build-essential libmariadb-dev; \
-    pip install -U pip; \
+    pip install -U pip setuptools; \
     pip install -r requirements.txt; \
     ldconfig; \
     apt-mark auto '.*' > /dev/null; \
