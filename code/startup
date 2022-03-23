@@ -94,15 +94,32 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
                     "filename": "logs/access__flat_line.log",  ##ここでflat_line形式のログファイルPathを指定する
                     "formatter": "key_value",
                 },
+                "syslog" : {
+                    "class" : "logging.handlers.SysLogHandler",
+                    "level" : "NOTSET",
+                    "address" : "/dev/log",
+                    "formatter" : "plain_console",
+                },
+            },
+            "root" : {
+                "handlers" : ["console"],
+                "level" : "DEBUG",
             },
             "loggers": {
                 "django_structlog": {
                     "handlers": ["console", "flat_line_file", "json_file"],
                     "level": "INFO",
+                    "propagate" : False,
                 },
                 "django_structlog_demo_project": {
                     "handlers": ["console", "flat_line_file", "json_file"],
                     "level": "INFO",
+                    "propegate" : False,
+                },
+                "debug" : {
+                    "handlers" : ["console"],
+                    "level" : "DEBUG",
+                    "propegate" : False,
                 },
             }
         }
@@ -153,11 +170,17 @@ APPURLS
     # making app/views.py
     cat <<APPVIEWS | sed -r "s/^ {8}//g" >> views.py
         from django.views import generic
+        from structlog import getLogger
+
+        # logging sample
+        logger = getLogger(__name__)
 
         class IndexView(generic.TemplateView):
             template_name = '${DJANGO_SPAPP}/index.html'
 
             def get_context_data(self, **kwargs):
+                # logging sample
+                logger.info("logging sample!")
                 context = super().get_context_data(**kwargs)
                 return context
 
