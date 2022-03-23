@@ -7,6 +7,10 @@ if [ -z $DJANGO_NAME ]; then
     echo env:DJANGO_NAME must be defined as project name.
     exit 1
 fi
+if [ -z $DJANGO_SPAPP ]; then
+    echo env:DJANGO_SPAPP must be defined as application name.
+    exit 1
+fi
 # -----------------------------------------------------------
 # プロジェクト初期化
 # -----------------------------------------------------------
