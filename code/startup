@@ -11,6 +11,11 @@ if [ -z $DJANGO_SPAPP ]; then
     echo env:DJANGO_SPAPP must be defined as application name.
     exit 1
 fi
+
+if [ $CLEARSITE = 1 ] && [ -d $DJANGO_NAME ] ; then
+    rm -rf $DJANGO_NAME
+fi    
+
 # ----------------------
 # 環境変数 ツールバージョン
 # ----------------------
@@ -265,11 +270,12 @@ APPVIEWS
         {% extends 'base.html' %}
         {% load static %}
         {% block content %}
-        <h2>sample template for index page</h2>
-        <p>
+        <h2>This site is not compatible with this browser</h2>
+        <p>Consider migrating to the latest ES6-enabled browser</p>
+        <!--<p>
             this is sample page<br/>
             <span id="1"></span>
-        </p>
+        </p>-->
         {% endblock %}
         {% block scripthead %}
         <!--
@@ -310,7 +316,7 @@ APPTMPINDEX
             </script>
         </head>
         <body>
-            <nav>This is Base Template Title</nav>
+            <nav>The navigation bar cannot be displayed in this browser.</nav>
             <main>
                 <article>
                     {% block content %}
@@ -331,6 +337,15 @@ APPTMPINDEX
         </html>
 APPTMPBASE
     popd
+    # migration for first database
+    python manage.py migrate
+    # create super user via django shell
+    # 参考サイト： https://www.delftstack.com/ja/howto/django/create-superuser-django/
+    cat <<CREATESUPER | sed -r "s/^\s*//g" | python manage.py shell
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        User.objects.create_superuser('admin' ,'', 'admin')
+CREATESUPER
 fi
 # ---------------------------------------------
 # CSS領域 (bootstrap) などスタティック領域初期化

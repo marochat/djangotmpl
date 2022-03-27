@@ -13,6 +13,7 @@ services:
       - TZ=Asia/Tokyo
       - DJANGO_NAME=${DJANGO_NAME}
       - DJANGO_SPAPP=${DJANGO_SPAPP}
+      - CLEARSITE=$CLEARSITE
     restart: always
   nginx:
     image: nginx:alpine
