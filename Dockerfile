@@ -1,4 +1,4 @@
-FROM python:3.10.3-slim-bullseye
+FROM python:3.10.4-slim-bullseye
 
 # python web and database library install
 ENV PYTHONUNBUFFERED 1

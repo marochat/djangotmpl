@@ -11,6 +11,14 @@ if [ -z $DJANGO_SPAPP ]; then
     echo env:DJANGO_SPAPP must be defined as application name.
     exit 1
 fi
+# ----------------------
+# 環境変数 ツールバージョン
+# ----------------------
+PYTHON_VERSION=`python --version`
+NODEJS_VERSION=`node --version`
+TYPESCRIPT_VERSION=`tsc --version`
+SASS_VERSION=`sass --version`
+
 # -----------------------------------------------------------
 # プロジェクト初期化
 # -----------------------------------------------------------
@@ -53,15 +61,28 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
     #   installed apps <-- spapp
     #   add import library
     #   add common template directory
+    # 一時的な置換文字列
+    builtin_bootstrap_setting_replace='*****builtin_bootstrap_replace_point*****'
     cat settings.py \
         | sed -zr "s/(\nINSTALLED_APPS = \[\n)/\1    '${APPCONFIG}',\n/g" \
         | sed -zr "s/(\nINSTALLED_APPS = \[\n[^]]*)(\])/\1    'tinymce',\n    'django_bootstrap5',\n\2/g" \
         | sed -r "/^from pathlib/iimport os" \
         | sed -r "/^from pathlib/aimport structlog" \
         | sed -zr "s/(\nMIDDLEWARE = \[\n[^]]*)(\])/\1    'django_structlog.middlewares.RequestMiddleware',\n\2/g" \
-        | sed -zr "s/(\nTEMPLATES = .+'DIRS': )\[\]/\1[os.path.join(BASE_DIR, 'templates')]/g" > tmpfile
+        | sed -zr "s/(\nTEMPLATES = .+'DIRS': )\[\]/\1[os.path.join(BASE_DIR, 'templates')]/g" \
+        | sed -zr "s/(\s*)('context_processors':[^]]*)(\])/\1\2    '${DJANGO_NAME}.context_processors.constant_text',\1\3/g" \
+        | sed -zr "s/('context_processors':[^]]*)(\],)/\1\2\n${builtin_bootstrap_setting_replace}/g" > tmpfile
         rm settings.py
-        mv tmpfile settings.py
+        # 一時文字列に置換した部分を設定項目の行に置き換える
+        builtin_bootstrap_replace_line=$(grep -nF ${builtin_bootstrap_setting_replace} tmpfile | sed -r 's/:.*//g')
+        sed -n "1,$((${builtin_bootstrap_replace_line} - 1))p" tmpfile > settings.py
+        cat <<BUILTIN_BOOTSTRAP >> settings.py
+            'builtins':[
+                'django_bootstrap5.templatetags.django_bootstrap5',
+            ],
+BUILTIN_BOOTSTRAP
+        sed "1,${builtin_bootstrap_replace_line}d" tmpfile >> settings.py
+        rm tmpfile
     # add other settings
     # --- suructlog setting, from the official example and additional setting.
     cat <<STTINGS0 | sed -r "s/^ {8}//g" >> settings.py
@@ -146,6 +167,28 @@ if [ ! -z ${DJANGO_SPAPP} ] && [ ! -d ${DJANGO_SPAPP} ]; then
             wrapper_class=structlog.stdlib.BoundLogger,
             cache_logger_on_first_use=True,
         )
+        # for bootstrap user override
+        BOOTSTRAP5 = {
+            "css_url": { "url":"/static/css/bootstrap-custom.css" },
+            "javascript_url": { "url": "/static/js/bootstrap.bundle.js" },
+        }
+        BOOTSTRAP_CUSTOMPATH = os.path.join(BASE_DIR, 'static/css/bootstrap-custom.css')
+        # for django-tinymce
+        TINYMCE_DEFAULT_CONFIG = {
+            'plugins': "table,spellchecker,paste,searchreplace,preview,textcolor,hr,link,code",
+        }
+        # for iFrame option
+        X_FRAME_OPTIONS = 'ALLOW'
+        # for Letsencrypt certification
+        CERT_ROOT = os.path.join(BASE_DIR, '.well-known')
+        CERT_URL = '/.well-known'
+        
+        # 環境変数
+        PYTHON_VERSION = '${PYTHON_VERSION}'
+        NODEJS_VERSION = '${NODEJS_VERSION}'
+        TYPESCRIPT_VERSION = '${TYPESCRIPT_VERSION}'
+        SASS_VERSION = 'SASS_VERSION'
+
 STTINGS0
     # edit urls.py
     cat urls.py \
@@ -155,6 +198,30 @@ STTINGS0
         | sed -zr "s/(\nurlpatterns = \[[^]]*)(\])/\1    path('tinymce\/', include('tinymce.urls')),\n\2/g" > tmpfile
     rm urls.py
     mv tmpfile urls.py
+    # make context_processors.py
+    cat <<CONTEXTPRO | sed -r "s/^ {8}//g" > context_processors.py
+        from django.conf import settings
+        import django
+        import platform
+        import re
+
+        def constant_text(reqest):
+            bsv = ''
+            with open(settings.BOOTSTRAP_CUSTOMPATH, 'r') as fh:
+                for ln in fh:
+                    if res := re.search('Bootstrap (v\S+)', ln):
+                        bsv = res[1]
+                        break
+            return {
+                'LANGUAGE_CODE': settings.LANGUAGE_CODE,
+                'APP_NAME': '${DJANGO_NAME}',
+                'PYTHON_VERSION': '( python : ' + platform.python_version() + ' )',
+                'DJANGO_VERSION': django.get_version(),
+                'BOOTSTRAP_VERSION': bsv,
+                'TYPESCRIPT_VERSION': settings.TYPESCRIPT_VERSION,
+                'SASS_VERSION': settings.SASS_VERSION,
+            }
+CONTEXTPRO
     popd
     # enter app directory
     pushd ${DJANGO_SPAPP} || exit 1
@@ -245,12 +312,20 @@ APPTMPINDEX
         <body>
             <nav>This is Base Template Title</nav>
             <main>
-            {% block content %}
-            {% endblock %}
+                <article>
+                    {% block content %}
+                    {% endblock %}
+                </article>
+                <footer>
+                    {% block footer %}{% endblock %}
+                    <hr/>
+                    <div>
+                    <span>Copyright &copy; Django sample template Site</span>
+                    <span>/ Powerd by bootstrap
+                    {{ BOOTSTRAP_VERSION }} &amp; django ver. {{ DJANGO_VERSION }} {{ PYTHON_VERSION }}</span>
+                    </div>
+                </footer>
             </main>
-            <footer>
-            {% block footer %}{% endblock %}
-            </footer>
             {% block script %}{% endblock %}
         </body>
         </html>
