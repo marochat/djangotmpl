@@ -29,7 +29,7 @@ RUN set -eux; \
     apt update; apt install -y wget
 # nodejs
 RUN set -eux; \
-    apt update; apt install -y nodejs npm git sudo; \
+    apt update; apt install -y nodejs npm git sudo procps; \
     npm install -g n; \
     n stable; \
     apt purge -y --auto-remove nodejs npm
