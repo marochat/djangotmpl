@@ -16,10 +16,10 @@ services:
       - CLEARSITE=$CLEARSITE
     healthcheck:
       test: ["CMD-SHELL", "ps x | grep uwsgi | grep -v grep"]
-      interval: 5s
+      interval: 10s
       timeout: 60s
       retries: 10
-      start_period: 2s
+      start_period: 10s
     restart: always
   nginx:
     image: nginx:alpine
