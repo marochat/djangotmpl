@@ -16,8 +16,8 @@ services:
       - CLEARSITE=$CLEARSITE
     healthcheck:
       test: ["CMD-SHELL", "ps x | grep uwsgi | grep -v grep"]
-      interval: 2s
-      timeout: 20s
+      interval: 5s
+      timeout: 60s
       retries: 10
       start_period: 2s
     restart: always
@@ -33,9 +33,7 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/uwsgi_params:/etc/nginx/uwsgi_params
-      - ./code:/code:ro
-      - ./nginx/90_delay_mount.sh:/docker-entrypoint.d/90_delay_mount.sh:ro
-      #- ./code/${DJANGO_NAME}/static:/static:ro
+      - ./code/${DJANGO_NAME}/static:/static:ro
     environment:
       - TZ=Asia/Tokyo
       - DJANGO_NAME=${DJANGO_NAME}

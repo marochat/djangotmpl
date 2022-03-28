@@ -316,7 +316,7 @@ APPTMPINDEX
             </script>
         </head>
         <body>
-            <nav>The navigation bar cannot be displayed in this browser.</nav>
+            <nav>dummy navigation bar</nav>
             <main>
                 <article>
                     {% block content %}
