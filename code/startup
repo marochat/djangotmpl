@@ -3,15 +3,21 @@ echo project name is $DJANGO_NAME .
 #
 sudo chown www-data.www-data . || exit 1
 
+# Environment variable 'DJANGO_NAME' configuring required
 if [ -z $DJANGO_NAME ]; then
     echo env:DJANGO_NAME must be defined as project name.
     exit 1
 fi
+
+# Environment variable 'DJANGO_SPAPP' is name of django single page application
+#   -- configuring required.
 if [ -z $DJANGO_SPAPP ]; then
     echo env:DJANGO_SPAPP must be defined as application name.
     exit 1
 fi
 
+# Set the Environment variable 'CLEARSITE' to '1' to remove and reconfigure the application
+# ex) $ CLEARSITE=1 docker-compose up -d
 if [ $CLEARSITE = 1 ] && [ -d $DJANGO_NAME ] ; then
     rm -rf $DJANGO_NAME
 fi    
@@ -241,17 +247,30 @@ CONTEXTPRO
 
         urlpatterns = [
             path('', views.IndexView.as_view(), name='index'),
+            path('ajax/', views.ajax_resp),
+            path('ajax/<str:param>/', views.ajax_resp),
+            path('ajax_get_navi/', views.ajax_get_navimenu),
+            path('ajax_authcheck/', views.ajax_authcheck),
         ]
 APPURLS
     # making app/views.py
     cat <<APPVIEWS | sed -r "s/^ {8}//g" >> views.py
         from django.views import generic
+        from django.urls import reverse_lazy
+        from django.http import Http404, HttpResponse
+        import json
+
         from structlog import getLogger
+
+        from . import urls
+        import spapp
 
         # logging sample
         logger = getLogger(__name__)
 
         class IndexView(generic.TemplateView):
+            '''sample menu comment'''
+            menu_title = 'Top'
             template_name = '${DJANGO_SPAPP}/index.html'
 
             def get_context_data(self, **kwargs):
@@ -259,7 +278,48 @@ APPURLS
                 logger.info("logging sample!")
                 context = super().get_context_data(**kwargs)
                 return context
-
+        
+        def ajax_get_navimenu(request):
+            ''' naviメニューをajax経由で取得するサンプル（urlpatternsから自動生成） '''
+            if not request.META.get('HTTP_X_REQUESTED_WITH', None):
+                raise Http404('not found!')
+            menudata = []
+            for url in urls.urlpatterns:
+                if hasattr(cls := eval(url.looup_str), 'menu_title'):
+                    menudata.append({
+                        'title': cls.menu_title,
+                        'path': str(reverse_lazy(urls.app_name + ':' + url.name)),
+                        'doc': cls.__doc__,
+                    })
+            return HttpResponse(json.dumps(menudata))
+        def ajax_authcheck(request):
+            '''認証セッションの状態を取得する'''
+            if not request.META.get('HTTP_X_REQUESTED_WITH', None):
+                raise Http404('not found!')
+            if request.user.is_authenticated:
+                auth = True
+                name = request.user.username
+            else:
+                auth = False
+                name = ''
+            return HttpResponse(json.dumps({'auth': auth, 'name': name}))
+        def ajax_resp(request, param=''):
+            '''ajax非同期通信サンプル'''
+            if res := request.META.get('HTTP_X_REQUESTED_WITH', None):
+                ref = request.META.get('HTTP_REFERER', 'noref')
+                sev = request.META.get('SERVER_NAME', '')
+            else:
+                raise Http404('not found!')
+            sample_data = [
+                {'referer': ref, 'server': sev},
+                {"title": "sample1", "description": 'context1'},
+                {"title": "sample2", "description": 'context2'},
+                {"title": "sample3", "description": 'context3'},
+            ]
+            # 認証セッション判別サンプル
+            if request.user.is_authenticated:
+                sample_data.append({"user": request.user.username})
+            return HttpResponse(json.dumps(sample_data))
 APPVIEWS
     # making app/template HTML
     mkdir templates
@@ -516,9 +576,152 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
     mv tmpfile tsconfig.json
     SPASCRIPT=${DJANGO_SPAPP}.ts
     cat <<SPASCRIPTCODE | sed -r "s/^ {8}//g" > ${SPASCRIPT}
-        export let init = () => {
-        var sp1 = document.getElementById("1");
-        sp1!.innerHTML = "javascript sample text";
+        /* ======================================================== **
+            Django + javascript(Typescript) Web application sample
+                                        marochanet org 2022/03 -
+        ** ======================================================== */
+
+        const getUniqueStr = () => new Date().getTime().toString(16) + Math.floor(1000*Math.random()).toString(16)
+
+        /* ---------------------------------- **
+            ajax fetch function : JSON value
+        ** ---------------------------------- */
+        const get_ajax_json = (url: string) : Promise<JSON> => {
+            return fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(request => {
+                if(request.ok){
+                    return request.json();
+                } else {
+                    return {"type": "Error", "message": "通信エラー：データを取得出来ませんでした"}
+                    //throw new Error(`通信エラーです status:${request.status}`);
+                }
+            })
+            .catch(error => {
+                console.log(error);
+                return {"typef": "Error", "message": "fetchエラー : データを取得出来ません"}
+            })
+        }
+
+        /* ------------------------------ **
+            navi bar menu DOM sample
+        ** ------------------------------ */
+        const setup_navibar = () => {
+            type menuitems = {
+                title: string
+                path: string
+                doc: string
+            }[];
+            type authdata = {
+                auth: boolean
+                name: string
+            };
+            ((navi : HTMLElement | null) => {
+                navi!.innerHTML ="";
+                // navigation title
+                navi!.appendChild((stitle => {
+                    stitle.className = "navbar-brand";
+                    stitle.href = "#";
+                    stitle.textContent = "Django Sample Template";
+                    return stitle;
+                })(document.createElement("a")));
+                // responsive buttin style
+                navi!.appendChild((button => {
+                    button.type = "button";
+                    button.setAttribute("data-bs-toggle", "collapse");
+                    button.setAttribute("data-bs-target", "#navbarContent");
+                    button.setAttribute("aria-controls", "navbarContect");
+                    button.setAttribute("aria-expanded", "false");
+                    button.setAttribute("aria-label", "Toggle navigation");
+                    button.appendChild((span => span)(document.createElement("span")));
+                    return button;
+                })(document.createElement("button")));
+                // navi menu items
+                navi!.appendChild((menutop => {
+                    menutop.className = "collapse navbar-collapse";
+                    menutop.id = "navbarContent";
+                    menutop.appendChild((menutable => {
+                        get_ajax_json("ajax_get_navi/")
+                            .then((menudat) => {
+                                for(let item of menudat as unknown as menuitems){
+                                    console.log(item.title);
+                                    menutable.appendChild((menuitem => {
+                                        menuitem.appendChild((link => {
+                                            link.href = item.path;
+                                            link.target = "_bkank";
+                                            link.textContent = item.title;
+                                            return link;
+                                        })(document.createElement("a")));
+                                        return menuitem;
+                                    })(document.createElement("li")));
+                                }
+                            });
+                        return menutable;
+                    })(document.createElement("ul")));
+                    get_ajax_json("ajax_authcheck/")
+                        .then(authdat => {
+                            let auth = authdat as unknown as authdata;
+                            console.log(auth.auth)
+                            if(auth.auth){
+                                menutop.appendChild((link => {
+                                    link.href = "/admin/";
+                                    link.textContent = auth.name;
+                                    return link;
+                                })(document.createElement("a")));
+                            }
+                            menutop.appendChild((adm => {
+                                adm.className = "btn";
+                                adm.href = (auth.auth)?"/admin/logout/?next=/":"/admin/login/?next=/";
+                                adm.textContent = (auth.auth)?"Logout":"Login";
+                                return adm;
+                            })(document.createElement("a")));
+                        });
+                    return menutop;
+                })(document.createElement("div")));
+                //navi!.innerHTML = "Django Web app navibar sample";
+                return navi;
+            })(document.querySelector("nav"));
+        }
+
+        /* ------------------------------ **
+            main contents DOM sample
+        ** ------------------------------ */
+            const setup_context = () => {
+            ((article : HTMLElement | null) => {
+                article!.innerHTML = "";
+                article!.appendChild((title => {
+                    title.style.color = "blue";
+                    title.className = "h2 m-3";
+                    title.textContent = "Sample Content.";
+                    return title
+                })(document.createElement("h2")));
+                article!.appendChild((text => {
+                    text.textContent = "This is sample text for Django Web application.";
+                    return text
+                })(document.createElement("p")));
+                article!.appendChild((para => {
+                    get_ajax_json("ajax/test/")
+                        .then( dat => {
+                            setTimeout(() => {
+                                para.innerHTML = "";
+                                para.appendChild((title => {
+                                    title.textContent = "Ajax JSON data sample (1s delay)."
+                                    return title;
+                                })(document.createElement("h5")));
+                                para.appendChild((text => {
+                                    text.textContent = JSON.stringify(dat);
+                                    return text;
+                                })(document.createElement("span")));
+                            }, 1000);
+                        });
+                    para.textContent = 'whmmmm....'
+                    return para;
+                })(document.createElement("p")))
+            })(document.querySelector("article"));
+        }
+
+        export const init = () => {
+            setup_navibar();
+            setup_context();
         }
 SPASCRIPTCODE
     cd ../../
