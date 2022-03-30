@@ -285,7 +285,7 @@ APPURLS
                 raise Http404('not found!')
             menudata = []
             for url in urls.urlpatterns:
-                if hasattr(cls := eval(url.looup_str), 'menu_title'):
+                if hasattr(cls := eval(url.lookup_str), 'menu_title'):
                     menudata.append({
                         'title': cls.menu_title,
                         'path': str(reverse_lazy(urls.app_name + ':' + url.name)),
