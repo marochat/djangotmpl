@@ -331,7 +331,7 @@ APPVIEWS
         {% load static %}
         {% block content %}
         <h2>This site is not compatible with this browser</h2>
-        <p>Consider migrating to the latest ES6-enabled browser</p>
+        <p>Consider migrating to the latest browser</p>
         <!--<p>
             this is sample page<br/>
             <span id="1"></span>
@@ -586,26 +586,24 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
         /* ---------------------------------- **
             ajax fetch function : JSON value
         ** ---------------------------------- */
-        const get_ajax_json = (url: string) : Promise<JSON> => {
-            return fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'}})
-            .then(request => {
+        const get_ajax_json = async (url: string) : Promise<any> => {
+            try {
+                let request: any = await fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 if(request.ok){
                     return request.json();
                 } else {
-                    return {"type": "Error", "message": "通信エラー：データを取得出来ませんでした"}
-                    //throw new Error(`通信エラーです status:${request.status}`);
+                    return {"type": "Error", "message": "通信エラー：データを取得出来ませんでした"};
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.log(error);
                 return {"typef": "Error", "message": "fetchエラー : データを取得出来ません"}
-            })
+            }
         }
 
         /* ------------------------------ **
             navi bar menu DOM sample
         ** ------------------------------ */
-        const setup_navibar = () => {
+        const setup_navibar = async () => {
             type menuitems = {
                 title: string
                 path: string
@@ -640,41 +638,43 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
                     menutop.className = "collapse navbar-collapse";
                     menutop.id = "navbarContent";
                     menutop.appendChild((menutable => {
-                        get_ajax_json("ajax_get_navi/")
-                            .then((menudat) => {
-                                for(let item of menudat as unknown as menuitems){
-                                    console.log(item.title);
-                                    menutable.appendChild((menuitem => {
-                                        menuitem.appendChild((link => {
-                                            link.href = item.path;
-                                            link.target = "_bkank";
-                                            link.textContent = item.title;
-                                            return link;
-                                        })(document.createElement("a")));
-                                        return menuitem;
-                                    })(document.createElement("li")));
-                                }
-                            });
+                        (async () => {
+                            let menudat: menuitems = await get_ajax_json("ajax_get_navi/");
+                            for(let item of menudat){
+                                console.log(item.title);
+                                menutable.appendChild((menuitem => {
+                                    menuitem.appendChild((link => {
+                                        link.href = item.path;
+                                        link.target = "_bkank";
+                                        link.textContent = item.title;
+                                        return link;
+                                    })(document.createElement("a")));
+                                    return menuitem;
+                                })(document.createElement("li")));
+                            }
+                        })();
                         return menutable;
                     })(document.createElement("ul")));
-                    get_ajax_json("ajax_authcheck/")
-                        .then(authdat => {
-                            let auth = authdat as unknown as authdata;
-                            console.log(auth.auth)
-                            if(auth.auth){
-                                menutop.appendChild((link => {
-                                    link.href = "/admin/";
-                                    link.textContent = auth.name;
-                                    return link;
-                                })(document.createElement("a")));
-                            }
-                            menutop.appendChild((adm => {
-                                adm.className = "btn";
-                                adm.href = (auth.auth)?"/admin/logout/?next=/":"/admin/login/?next=/";
-                                adm.textContent = (auth.auth)?"Logout":"Login";
-                                return adm;
+                    (async() =>{
+                        let auth: authdata = await get_ajax_json("ajax_authcheck");
+                        console.log(auth.auth)
+                        console.log(location.pathname)
+                        if(auth.auth){
+                            menutop.appendChild((link => {
+                                link.href = "/admin/";
+                                link.textContent = auth.name;
+                                return link;
                             })(document.createElement("a")));
-                        });
+                        }
+                        menutop.appendChild((adm => {
+                            const pth = location.pathname + location.search;
+                            console.log(location.hostname + " : " + location.pathname + " : " + location.search)
+                            adm.className = "btn";
+                            adm.href = (auth.auth)?"/admin/logout/?next=" + pth:"/admin/login/?next=" + pth;
+                            adm.textContent = (auth.auth)?"Logout":"Login";
+                            return adm;
+                        })(document.createElement("a")));
+                    })();
                     return menutop;
                 })(document.createElement("div")));
                 //navi!.innerHTML = "Django Web app navibar sample";
@@ -699,29 +699,53 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
                     return text
                 })(document.createElement("p")));
                 article!.appendChild((para => {
-                    get_ajax_json("ajax/test/")
-                        .then( dat => {
-                            setTimeout(() => {
-                                para.innerHTML = "";
-                                para.appendChild((title => {
-                                    title.textContent = "Ajax JSON data sample (1s delay)."
-                                    return title;
-                                })(document.createElement("h5")));
-                                para.appendChild((text => {
-                                    text.textContent = JSON.stringify(dat);
-                                    return text;
-                                })(document.createElement("span")));
-                            }, 1000);
-                        });
+                    (async() => {
+                        let dat = await get_ajax_json("ajax/test/");
+                        setTimeout(() => {
+                            para.innerHTML = "";
+                            para.appendChild((title => {
+                                title.textContent = "Ajax JSON data sample (1s delay)."
+                                return title;
+                            })(document.createElement("h5")));
+                            para.appendChild((text => {
+                                text.textContent = JSON.stringify(dat);
+                                return text;
+                            })(document.createElement("span")));
+                        }, 500);
+                    })();
                     para.textContent = 'whmmmm....'
                     return para;
                 })(document.createElement("p")))
             })(document.querySelector("article"));
         }
 
+        const es2017_async_check = () : boolean => {
+            let val: boolean = true;
+            try {
+                eval('async () => {}');
+            } catch(e) {
+                if (e instanceof SyntaxError) {
+                    val = false;
+                } else {
+                    throw e;
+                }
+            }
+            return val;
+        }
+
         export const init = () => {
-            setup_navibar();
-            setup_context();
+            if(es2017_async_check()){
+                setup_navibar();
+                setup_context();
+            } else {
+                ((article : HTMLElement | null) => {
+                    let para = article!.querySelector("p");
+                    para!.before((text => {
+                        text.innerHTML = "This site requires an ES2017 (ES8)-enabled browser";
+                        return text;
+                    })(document.createElement("p")));
+                })(document.querySelector("article"));
+            }
         }
 SPASCRIPTCODE
     cd ../../
