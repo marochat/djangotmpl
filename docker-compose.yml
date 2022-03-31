@@ -13,7 +13,7 @@ services:
       - TZ=Asia/Tokyo
       - DJANGO_NAME=${DJANGO_NAME}
       - DJANGO_SPAPP=${DJANGO_SPAPP}
-      - CLEARSITE=$CLEARSITE
+      - CLEARSITE=${CLEARSITE:-0}
     healthcheck:
       test: ["CMD-SHELL", "ps x | grep uwsgi | grep -v grep"]
       interval: 10s
@@ -26,7 +26,7 @@ services:
     expose:
       - "80"
     ports:
-      - "8000:80"
+      - "${NGINX_PORT:-8000}:80"
     depends_on:
       django:
         condition: service_healthy
