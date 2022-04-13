@@ -478,7 +478,7 @@ if [ ! -f ${CUSTOM_SCSS} ]; then
                 @extend .container, .my-2;
                 text-align: right;
                 span {
-                    @expand .text-muted;
+                    @extend .text-muted;
                     font-size: small;
                     font-style: italic;
                     display: inline-block;
@@ -574,19 +574,95 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
       | sed -r "s/^(\s*\"module\": )\"commonjs\"(.*)$/\1\"esnext\"\2/g" > tmpfile
     rm tsconfig.json
     mv tmpfile tsconfig.json
-    SPASCRIPT=${DJANGO_SPAPP}.ts
-    cat <<SPASCRIPTCODE | sed -r "s/^ {8}//g" > ${SPASCRIPT}
-        /* ======================================================== **
-            Django + javascript(Typescript) Web application sample
-                                        marochanet org 2022/03 -
-        ** ======================================================== */
+    cat <<COMMSCRIPTCODE | sed -r "s/^ {8}//g" > common.ts
+        /**
+        * NULLセーフをアサートする関数 : (any | nul)型などが対象
+        * @param  {T} val
+        * @returns assertsvalisNonNullable
+        */
 
-        const getUniqueStr = () => new Date().getTime().toString(16) + Math.floor(1000*Math.random()).toString(16)
+        export function assertIsDefined<T>(val: T) : asserts val is NonNullable<T> {
+            if(val === undefined || val === null){
+                throw new Error(
+                    `Expected 'val' to be defined, but received ${val}`
+                );
+            }
+        }
+        /**
+        * val が指定のクラスのオブジェクトであることをアサートする関数
+        * アップキャストで渡された引数を本来のクラスにダウンキャストする時に使用
+        * @param  {any} val
+        * @param  {new(} cls
+        * @returns assertsvalisT
+        */
+        export function assertIsInstanceOf<T>(val: any, cls: new() => T) : asserts val is T {
+            if(!(val instanceof cls)){
+                throw new Error(`${val} is not instance of cls`);
+            }
+        }
 
-        /* ---------------------------------- **
-            ajax fetch function : JSON value
-        ** ---------------------------------- */
-        const get_ajax_json = async (url: string) : Promise<any> => {
+        /**
+        * HTMLElementにメソッドを追加するためのおまじない
+        * グローバルのインタフェースにメソッド追加
+        * とくにexportしなくて良い？
+        */
+        declare global {
+            interface HTMLElement {
+                editElement(func: (elem: HTMLElement) =>  void): HTMLElement
+                appendChain(child: HTMLElement | string): HTMLElement
+                clearElement(): HTMLElement
+            }
+        }
+        /**
+        * HTMLElementに自身を帰すメソッドを追加する
+        * 　DOMでメソッドチェーンが可能になると思う
+        * @param  {(elem: HTMLElement =>void} func
+        * @returns HTMLElement
+        */
+        HTMLElement.prototype.editElement = function(func: (elem : HTMLElement) => void) : HTMLElement {
+            assertIsInstanceOf(this, HTMLElement);
+            //console.log("ElementType : " + this.constructor.name)
+            func(this);
+            return this;
+        }
+        /**
+        * HTMLElement.append(Child)のメソッドチェーン用のラッパ
+        * 引数はHTMLElementとstringを受け付ける
+        * @param  {HTMLElement|string} child
+        * @returns HTMLElement
+        */
+        HTMLElement.prototype.appendChain = function(child: HTMLElement | string) : HTMLElement {
+            assertIsInstanceOf(this, HTMLElement);
+            if(child instanceof HTMLElement){
+                this.appendChild(child);
+            } else if (typeof(child) === "string"){
+                this.append(child);
+            } else {
+                throw new Error();
+            }
+            return this;
+        }
+        /**
+        * HTMLElementの内容をクリアして自身を返す。メソッドチェーン用
+        * @returns HTMLElement
+        */
+        HTMLElement.prototype.clearElement = function() : HTMLElement {
+            assertIsInstanceOf(this, HTMLElement);
+            this.innerHTML = "";
+            return this;
+        }
+
+        /**
+        * 時刻情報をもとにユニークな文字列を返す（IDなど一時的に使用）
+        */
+        export const getUniqueStr = () => new Date().getTime().toString(16) + Math.floor(1000*Math.random()).toString(16)
+
+        /**
+        * AJAX通信でJSON形式のデータを取得する（async関数）
+        * @param  {string} url  : リクエストURL
+        * @returns Promise<any> : JSONデータ
+        */
+        export const get_ajax_json = async (url: string) : Promise<any> => {
             try {
                 let request: any = await fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 if(request.ok){
@@ -599,127 +675,20 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
                 return {"typef": "Error", "message": "fetchエラー : データを取得出来ません"}
             }
         }
-
-        /* ------------------------------ **
-            navi bar menu DOM sample
-        ** ------------------------------ */
-        const setup_navibar = async () => {
-            type menuitems = {
-                title: string
-                path: string
-                doc: string
-            }[];
-            type authdata = {
-                auth: boolean
-                name: string
-            };
-            ((navi : HTMLElement | null) => {
-                navi!.innerHTML ="";
-                // navigation title
-                navi!.appendChild((stitle => {
-                    stitle.className = "navbar-brand";
-                    stitle.href = "#";
-                    stitle.textContent = "Django Sample Template";
-                    return stitle;
-                })(document.createElement("a")));
-                // responsive buttin style
-                navi!.appendChild((button => {
-                    button.type = "button";
-                    button.setAttribute("data-bs-toggle", "collapse");
-                    button.setAttribute("data-bs-target", "#navbarContent");
-                    button.setAttribute("aria-controls", "navbarContect");
-                    button.setAttribute("aria-expanded", "false");
-                    button.setAttribute("aria-label", "Toggle navigation");
-                    button.appendChild((span => span)(document.createElement("span")));
-                    return button;
-                })(document.createElement("button")));
-                // navi menu items
-                navi!.appendChild((menutop => {
-                    menutop.className = "collapse navbar-collapse";
-                    menutop.id = "navbarContent";
-                    menutop.appendChild((menutable => {
-                        (async () => {
-                            let menudat: menuitems = await get_ajax_json("ajax_get_navi/");
-                            for(let item of menudat){
-                                console.log(item.title);
-                                menutable.appendChild((menuitem => {
-                                    menuitem.appendChild((link => {
-                                        link.href = item.path;
-                                        link.target = "_bkank";
-                                        link.textContent = item.title;
-                                        return link;
-                                    })(document.createElement("a")));
-                                    return menuitem;
-                                })(document.createElement("li")));
-                            }
-                        })();
-                        return menutable;
-                    })(document.createElement("ul")));
-                    (async() =>{
-                        let auth: authdata = await get_ajax_json("ajax_authcheck");
-                        console.log(auth.auth)
-                        console.log(location.pathname)
-                        if(auth.auth){
-                            menutop.appendChild((link => {
-                                link.href = "/admin/";
-                                link.textContent = auth.name;
-                                return link;
-                            })(document.createElement("a")));
-                        }
-                        menutop.appendChild((adm => {
-                            const pth = location.pathname + location.search;
-                            console.log(location.hostname + " : " + location.pathname + " : " + location.search)
-                            adm.className = "btn";
-                            adm.href = (auth.auth)?"/admin/logout/?next=" + pth:"/admin/login/?next=" + pth;
-                            adm.textContent = (auth.auth)?"Logout":"Login";
-                            return adm;
-                        })(document.createElement("a")));
-                    })();
-                    return menutop;
-                })(document.createElement("div")));
-                //navi!.innerHTML = "Django Web app navibar sample";
-                return navi;
-            })(document.querySelector("nav"));
+        /**
+        * async版timeout関数 Promise<void>を返すのでawaitする
+        * @param  {number} ms
+        * @returns Promise
+        */
+        export const timeout = async (ms: number) : Promise<void> =>  {
+            return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        /* ------------------------------ **
-            main contents DOM sample
-        ** ------------------------------ */
-            const setup_context = () => {
-            ((article : HTMLElement | null) => {
-                article!.innerHTML = "";
-                article!.appendChild((title => {
-                    title.style.color = "blue";
-                    title.className = "h2 m-3";
-                    title.textContent = "Sample Content.";
-                    return title
-                })(document.createElement("h2")));
-                article!.appendChild((text => {
-                    text.textContent = "This is sample text for Django Web application.";
-                    return text
-                })(document.createElement("p")));
-                article!.appendChild((para => {
-                    (async() => {
-                        let dat = await get_ajax_json("ajax/test/");
-                        setTimeout(() => {
-                            para.innerHTML = "";
-                            para.appendChild((title => {
-                                title.textContent = "Ajax JSON data sample (1s delay)."
-                                return title;
-                            })(document.createElement("h5")));
-                            para.appendChild((text => {
-                                text.textContent = JSON.stringify(dat);
-                                return text;
-                            })(document.createElement("span")));
-                        }, 500);
-                    })();
-                    para.textContent = 'whmmmm....'
-                    return para;
-                })(document.createElement("p")))
-            })(document.querySelector("article"));
-        }
-
-        const es2017_async_check = () : boolean => {
+        /**
+        * ES8(2017) async/await構文に対応しているかを判別して返す
+        * @returns boolean
+        */
+        export const es2017_async_check = () : boolean => {
             let val: boolean = true;
             try {
                 eval('async () => {}');
@@ -733,18 +702,150 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
             return val;
         }
 
-        export const init = () => {
+        /**
+        * navi bar menu DOM sample
+        */
+        export const setup_navibar = () => {
+            type menuitems = {
+                title: string
+                path: string
+                doc: string
+            }[];
+            type authdata = {
+                auth: boolean
+                name: string
+            };
+            const nav: HTMLElement = document.querySelector("nav") ?? (() => {throw new TypeError})();
+            nav.clearElement()
+            .appendChain(document.createElement("a").editElement( stitle => {
+                assertIsInstanceOf(stitle, HTMLAnchorElement)
+                stitle.className = "navbar-brand";
+                stitle.href = "#";
+                })
+                .appendChain("Django Sample Template")
+            )
+            // responsive buttin style
+            .appendChain(document.createElement("button").editElement(
+                button => {
+                    assertIsInstanceOf(button, HTMLButtonElement);
+                    button.type = "button";
+                    button.setAttribute("data-bs-toggle", "collapse");
+                    button.setAttribute("data-bs-target", "#navbarContent");
+                    button.setAttribute("aria-controls", "navbarContect");
+                    button.setAttribute("aria-expanded", "false");
+                    button.setAttribute("aria-label", "Toggle navigation");
+                })
+                .appendChain(document.createElement("span"))
+            )
+            // navi menu 
+            .appendChain(document.createElement("div").editElement( menutop => {
+                menutop.className = "collapse navbar-collapse";
+                menutop.id = "navbarContent";
+                }).appendChain(document.createElement("ul").editElement(async menutable => {
+                    let menudat: menuitems = await get_ajax_json("ajax_get_navi/");
+                    for(let item of menudat){
+                        console.log(item.title);
+                        menutable.appendChild(document.createElement("li").editElement( menuitem => {
+                            menuitem.appendChild(document.createElement("a").editElement(link => {
+                                assertIsInstanceOf(link, HTMLAnchorElement);
+                                link.href = item.path;
+                                link.target = "_bkank";
+                                })
+                                .appendChain(item.title)
+                            )
+                        }));
+                    }
+                })).editElement(async menutop => {
+                    let auth: authdata = await get_ajax_json("ajax_authcheck");
+                    console.log(auth.auth);
+                    console.log(location.pathname);
+                    if(auth.auth){
+                        menutop.appendChild(document.createElement("a").editElement(
+                            link => {
+                                assertIsInstanceOf(link, HTMLAnchorElement);
+                                link.href = "/admin/";
+                            })
+                            .appendChain(auth.name)
+                        );
+                    }
+                    menutop.appendChild(document.createElement("a").editElement(
+                        adm => {
+                            const pth = location.pathname + location.search;
+                            assertIsInstanceOf(adm, HTMLAnchorElement);
+                            console.log(location.hostname + " : " + location.pathname + " : " + location.search)
+                            adm.className = "btn";
+                            adm.href = (auth.auth)?"/admin/logout/?next=" + pth:"/admin/login/?next=" + pth;
+                        })
+                        .appendChain((auth.auth)?"Logout":"Login")
+                    );
+                })
+            );
+        }
+COMMSCRIPTCODE
+
+    SPASCRIPT=${DJANGO_SPAPP}.ts
+    cat <<SPASCRIPTCODE | sed -r "s/^ {8}//g" > ${SPASCRIPT}
+        /* ======================================================== **
+            Django + javascript(Typescript) Web application sample
+                                        marochanet org 2022/03 -
+        ** ======================================================== */
+
+        import { getUniqueStr, get_ajax_json, timeout, es2017_async_check, setup_navibar,
+            assertIsDefined, assertIsInstanceOf } from "./common.js";
+
+        export const getNewElement = (tag: string, func: (elem: any) => void) => {
+            const elem = document.createElement(tag);
+            func(elem);
+            return elem;
+        }
+
+        const sample_view = ():void => {
+            const article: HTMLElement = document.querySelector("article") ?? (() => {throw new TypeError})();
+            article.clearElement()
+            .appendChain(document.createElement("header").appendChain("django SPAPP Sample"))
+            .appendChain(document.createElement("div").editElement(bframe => {
+                bframe.style.backgroundColor = "lightgreen";
+                bframe.style.padding = "5px";
+                })
+                .appendChain("django single page application DOM sample page.")
+            )
+        }
+
+        /**
+        * HTML文書から呼び出されるDOM初期化関数
+        */
+        export const init = (): void => {
+            type sidemenu_type = {
+                title: string
+                func: (param: void) => void
+            }[];
+            // サイドメニュー項目
+            const sidemenu: sidemenu_type = [
+                {title: "Sample Page1", func: sample_view},
+            ]
+
             if(es2017_async_check()){
-                setup_navibar();
-                setup_context();
+                setup_navibar()
+                const aside: HTMLElement = document.querySelector("aside") ?? (() => {throw new TypeError})()
+                aside.clearElement()
+                .appendChain(document.createElement("header").appendChain("Sample Menu"))
+                .appendChain(document.createElement("ul").editElement(ul => {
+                    for(let item of sidemenu){
+                        ul.appendChild(document.createElement("li")
+                            .appendChain(document.createElement("a").editElement(link => {
+                                assertIsInstanceOf(link, HTMLAnchorElement);
+                                link.href = "#";
+                                link.onclick = () => item.func();
+                            }).appendChain(item.title))
+                        );
+                    }
+                }));
+                sidemenu[0].func();
             } else {
-                ((article : HTMLElement | null) => {
-                    let para = article!.querySelector("p");
-                    para!.before((text => {
-                        text.innerHTML = "This site requires an ES2017 (ES8)-enabled browser";
-                        return text;
-                    })(document.createElement("p")));
-                })(document.querySelector("article"));
+                const para : HTMLElement =
+                    document.querySelector("article")?.querySelector("p") ?? (() => {throw new TypeError})() 
+                para.before(document.createElement("p")
+                    .appendChain("This site requires an ES2017 (ES8)-enabled browser"));
             }
         }
 SPASCRIPTCODE
