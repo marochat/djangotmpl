@@ -571,6 +571,7 @@ if [ ! -d ${DJANGO_SPAPP} ]; then
     tsc --init
     # tsconfig 編集 for フロントエンド
     cat tsconfig.json \
+      | sed -r "s/^(\s*\"target\": )\"es2016\"(.*)$/\1\"es2017\"\2/g" \
       | sed -r "s/^(\s*\"module\": )\"commonjs\"(.*)$/\1\"esnext\"\2/g" > tmpfile
     rm tsconfig.json
     mv tmpfile tsconfig.json
