@@ -330,12 +330,28 @@ APPVIEWS
         {% extends 'base.html' %}
         {% load static %}
         {% block content %}
-        <h2>This site is not compatible with this browser</h2>
-        <p>Consider migrating to the latest browser</p>
-        <!--<p>
-            this is sample page<br/>
-            <span id="1"></span>
-        </p>-->
+        <div class="column2-lmenu">
+            <div class="column-start">
+                <div class="card">
+                    <aside>
+                        <header>side menu</header>
+                        <ul>
+                            <li>sample1</li>
+                        </ul>
+                    </aside>
+                </div>
+            </div>
+            <div class="column-center">
+                <article>
+                    <h2>This site is not compatible with this browser</h2>
+                    <p>Consider migrating to the latest browser</p>
+                    <!--<p>>
+                        this is sample page<br/>
+                        <span id="1"></span>
+                    </p>-->
+                </article>
+            </div>
+        </div>
         {% endblock %}
         {% block scripthead %}
         <!--
@@ -378,13 +394,11 @@ APPTMPINDEX
         <body>
             <nav>dummy navigation bar</nav>
             <main>
-                <article>
-                    {% block content %}
-                    {% endblock %}
-                </article>
+                {% block content %}
+                {% endblock %}
+                <hr/>
                 <footer>
                     {% block footer %}{% endblock %}
-                    <hr/>
                     <div>
                     <span>Copyright &copy; Django sample template Site</span>
                     <span>/ Powerd by bootstrap
@@ -526,11 +540,27 @@ if [ ! -f ${CUSTOM_SCSS} ]; then
                     }
                 }
             }
+            @mixin columns-2l(\$start, \$center) {
+                @extend .row, .justify-content-md-center;
+                div.column-start {
+                    @extend .order-2, .order-md-1, .col-md-#{\$start}, .px-1;
+                    div.card {
+                        @include side-card();
+                    }
+                }
+                div.column-center {
+                    @extend .col-12, .order-1, .order-md-2, .col-md-#{\$center}, .px-1, .mx-0;
+                }
+            }
+
             div.column3 {
                 @include columns-3(2,7,3);
             }
             div.column3x {
                 @include columns-3(1,10,1);
+            }
+            div.column2-lmenu {
+                @include columns-2l(2, 10);
             }
         }
 EOS
@@ -805,7 +835,6 @@ COMMSCRIPTCODE
             article.clearElement()
             .appendChain(document.createElement("header").appendChain("django SPAPP Sample"))
             .appendChain(document.createElement("div").editElement(bframe => {
-                bframe.style.backgroundColor = "lightgreen";
                 bframe.style.padding = "5px";
                 })
                 .appendChain("django single page application DOM sample page.")
