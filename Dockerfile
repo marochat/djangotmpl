@@ -47,4 +47,4 @@ RUN echo '#!/bin/bash' > /code/startup; \
     echo 'echo startup script.' >> /code/startup; \
     chmod +x /code/startup
 
-CMD ["/code/startup"]
+CMD ["/bin/bash"]

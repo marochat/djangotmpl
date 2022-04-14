@@ -5,6 +5,7 @@ services:
     build: .
     image: django_image:test
     user: www-data
+    command: /code/startup
     expose:
       - "8001"
     volumes:
