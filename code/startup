@@ -824,12 +824,6 @@ COMMSCRIPTCODE
         import { getUniqueStr, get_ajax_json, timeout, es2017_async_check, setup_navibar,
             assertIsDefined, assertIsInstanceOf } from "./common.js";
 
-        export const getNewElement = (tag: string, func: (elem: any) => void) => {
-            const elem = document.createElement(tag);
-            func(elem);
-            return elem;
-        }
-
         const sample_view = ():void => {
             const article: HTMLElement = document.querySelector("article") ?? (() => {throw new TypeError})();
             article.clearElement()
